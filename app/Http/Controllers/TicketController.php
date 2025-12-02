@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\TicketReplyRequest;
 use App\Http\Requests\TicketStoreRequest;
+use App\Http\Resources\TicketReplyResource;
 use App\Http\Resources\TicketResource;
 use App\Models\Ticket;
+use App\Models\TicketReply;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -40,10 +43,41 @@ class TicketController extends Controller
             return response()->json([
                 'message' => 'Terjadi Kesalahan',
                 'data' => null,
-                'error'=>$th->getMessage(),
+                'error' => $th->getMessage(),
             ], 500);
         }
     }
+
+
+    public function show($code)
+    {
+        try {
+            $ticket = Ticket::where('code', $code)->first();
+            if (!$ticket) {
+                return response()->json([
+                    'message' => 'ticket not found'
+                ], 404);
+            }
+
+            if (auth()->user()->role == 'user' && $ticket->user_id != auth()->user()->id) {
+                return response()->json([
+                    'message' => 'Permission Denied'
+                ], 404);
+            }
+
+            return response()->json([
+                'message' => 'ticket reply has successfully showed',
+                'data' => new TicketResource($ticket),
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'message' => 'Terjadi Kesalahan',
+                'data' => null,
+                'error' => $th->getMessage(),
+            ], 500);
+        }
+    }
+
 
     public function index(Request $request)
     {
@@ -77,7 +111,58 @@ class TicketController extends Controller
         } catch (\Exception $th) {
             return response()->json([
                 'message' => 'Terjadi Kesalahan',
-                'data' => null,
+                'error' => $th->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function storeReply(TicketReplyRequest $request, $code)
+    {
+        $data = $request->validated();
+
+        DB::beginTransaction();
+
+        try {
+            $ticket = Ticket::where('code', $code)->first();
+            
+            if (!$ticket) {
+                return response()->json([
+                    'message' => 'ticket not found'
+                ], 404);
+            }
+
+            if (auth()->user()->role == 'user' && $ticket->user_id != auth()->user()->id) {
+                return response()->json([
+                    'message' => 'Permission Denied'
+                ], 404);
+            }
+
+            $ticketReply = new TicketReply();
+            $ticketReply->ticket_id = $ticket->id;
+            $ticketReply->user_id = auth()->user()->id;
+            $ticketReply->content = $data['content'];
+            $ticketReply->save();
+
+            if(auth()->user()->role == 'admin'){
+                $ticket->status = $data['status'];
+                if($data['status']=='resolved'){
+                    $ticket->completedAt = \now();
+                }
+                $ticket->save();
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Ticket reply created success',
+                'data' => new TicketReplyResource($ticketReply)
+            ]);
+
+        } catch (Exception $th) {
+            //throw $th;
+            return response()->json([
+                'message' => 'Terjadi Kesalahan',
+                'error' => $th->getMessage(),
             ], 500);
         }
     }
