@@ -19,10 +19,10 @@ class DashboardController extends Controller
         $totalTickets = Ticket::whereBetween('created_at', [$currentMonth, $endOfMonth])->count();
 
         $activeTickets = Ticket::whereBetween('created_at', [$currentMonth, $endOfMonth])
-            ->where('status', '!=', 'resolved');
+            ->where('status', '!=', 'resolved')->count();
 
         $resolvedTickets = Ticket::whereBetween('created_at', [$currentMonth, $endOfMonth])
-            ->where('status', 'resolved');
+            ->where('status', 'resolved')->count();
 
         $averageResolutionTime = Ticket::whereBetween('created_at', [$currentMonth, $endOfMonth])
             ->where('status', 'resolved')
